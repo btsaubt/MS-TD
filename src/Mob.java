@@ -5,13 +5,13 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 
 public class Mob {
-	public double hp = 0;
+	public double hp = 0; // current hp of mob
 	public int speed; // pixels per second
 	public double pathPos; // position on the path's grid of 80x80 squares
-	public int level;
-	public boolean exist = false;
-	public int[] coords = new int[]{-9999,-9999};
+	public boolean exist = false; // does this mob exist?
+	public int[] coords = new int[] { -9999, -9999 }; // top left coordinates
 
+	// constructor initialize variables
 	public Mob(int wave) {
 		hp = wave * wave;
 		speed = 3;
@@ -19,6 +19,8 @@ public class Mob {
 		exist = true;
 	}
 
+	// if this mob is hit, reduce the damage, and if it dies, remove it from
+	// existence
 	public void isHit(double damage) {
 		hp -= damage;
 		if (hp <= 0) {
@@ -26,11 +28,13 @@ public class Mob {
 		}
 	}
 
+	// return coordinates of this mob
 	public int[] getCoords() {
 		return coords;
 	}
 
-	// returns coordinates (top center position on path) for drawing
+	// returns coordinates (top center position on path) for drawing, and
+	// calculate them
 	public int[] calcCoords(int[] d, double[] l, int length) {
 		coords = new int[] { 120, -40 };
 		double tempL = pathPos;
@@ -68,6 +72,7 @@ public class Mob {
 		return coords;
 	}
 
+	// does this mob exist?
 	public boolean getExist() {
 		return exist;
 	}

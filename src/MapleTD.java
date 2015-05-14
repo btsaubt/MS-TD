@@ -6,50 +6,95 @@ import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.net.URL;
+
+import javafx.embed.swing.JFXPanel;
+import javafx.scene.*;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
 
+import sun.audio.*;
+
 public class MapleTD extends Canvas {
 	private Image bgBuffer; // background buffer
-	private int wave = 1;
-	private int money = 100;
-	private int life = 100;
-	private int framerate = 30;
-	private int timer = 0;
-	private int mousex, mousey;
-	private int whichMap;
+	private int wave = 1; // current wave; each subsequent wave is harder than
+							// the previous
+	private int money = 100; // current money; use money to purchase towers or
+								// upgrade current ones
+	private int life = 100; // amount of life Empress Cygnus has left; you lose
+							// when it reaches 0
+	private int framerate = 30; // current framerate, increases to 60 for 2x
+								// speed
+	private int timer = 0; // current timer; counts the number of 1/30 seconds
+							// (tics) that have passed since the wave started
+	private int mousex, mousey; // mouse position, currently unused
+	private MediaPlayer mp; // music
+	private int whichMap; // which map will be played on
 	private int phase = 3; // 0 for standby 1 for wave 2 for gameover 3 for main
 							// menu 4 for instruction
+	private int prephase = -1; // previous phase
 	private int purchaseSelect = 5; // 0 for bw, 1 for wa, 2 for nw, 3 for dw, 4
 									// for tb
 	private int towerSelect = -1; // which already placed tower are you looking
 									// at
-	public String[] consoleOutput = new String[] { "", "", "", "", "" };
+	public String[] consoleOutput = new String[] { "", "", "", "", "" }; // output
+																			// that
+																			// will
+																			// be
+																			// shown
+																			// to
+																			// the
+																			// player
+	private File mayper; // music for main menu
+	private File[] bgm = new File[3]; // music for each map
 
-	public Map map = new Map(1, 0);;
-	private int[] costs = new int[] { 100, 50, 75, 150, 125 };
+	public Map map = new Map(1, 0); // map object, main hub for running of the
+									// game
+	private int[] costs = new int[] { 100, 50, 75, 150, 125 }; // costs of each
+																// tower,
+																// respectively
 
+	// current thread - runs each tic
 	private Thread t = new Thread(new Runnable() {
 		public void run() {
+			// while this is the current thread
 			while (Thread.currentThread() == t) {
-				if (phase == 1)
+				if (phase != prephase) // change music if there is a transition
+										// between screens
+					music();
+				prephase = phase;
+				if (phase == 1) // tic if the wave is ongoing
 					tic();
 				try {
-					Thread.sleep(1000 / framerate);
+					Thread.sleep(1000 / framerate); // framerate 30 fps (or 60
+													// fps)
 				} catch (InterruptedException e) {
 					System.out.println("Main thread interrupted");
 				}
-				repaint();
+				repaint(); // update the canvas
 			}
 		}
 	});
 
+	// read files
+	public void reader() {
+		mayper = new File("maypersutory.mp3");
+		bgm[0] = new File("sleepywood_music.mp3");
+		bgm[1] = new File("pyramid_music.mp3");
+		bgm[2] = new File("sector_music.mp3");
+	}
+
+	// main class, starts everything
 	public static void main(String[] args) {
 		Frame f = new Frame();
+		final JFXPanel fxPanel = new JFXPanel(); // just to avoid
+													// illegalstateexception
+
+		// close program when window closes
 		f.addWindowListener(new WindowAdapter() {
 			public void windowClosing(WindowEvent e) {
 				System.exit(0);
@@ -63,15 +108,35 @@ public class MapleTD extends Canvas {
 		f.show();
 	}
 
+	// change music if needed, otherwise start it
+	public void music() {
+		if (phase == 3 || phase == 4) {
+			if (mp != null)
+				mp.stop();
+			mp = new MediaPlayer(new Media(mayper.toURI().toString()));
+			mp.play();
+		} else if (phase == 0 || phase == 1 || phase == 2) {
+			if (mp != null)
+				mp.stop();
+			mp = new MediaPlayer(new Media(bgm[whichMap].toURI().toString()));
+			mp.play();
+		}
+	}
+
+	// constructor class, initialize variables
 	public MapleTD() {
 		super();
+		reader();
+		music();
 		init();
 		t.start();
+
+		// keyboard control
 		addKeyListener(new KeyAdapter() {
 			public void keyPressed(KeyEvent e) {
 				int kc = e.getKeyCode();
 				switch (kc) {
-				case KeyEvent.VK_ESCAPE:
+				case KeyEvent.VK_ESCAPE: // close some extra information windows
 					towerSelect = -1;
 					purchaseSelect = 5;
 					break;
@@ -79,91 +144,137 @@ public class MapleTD extends Canvas {
 			}
 		});
 
+		// mouse control
 		addMouseListener(new MouseAdapter() {
 			public void mousePressed(MouseEvent e) {
 				mousex = e.getX();
 				mousey = e.getY();
+
+				// if in standby phase
 				if (phase == 0) {
 					if (e.getX() >= 840 && e.getX() <= 900 && e.getY() >= 880
-							&& e.getY() <= 940) {
+							&& e.getY() <= 940) { // start wave at normal speed
 						framerate = 30;
 						phase = 1;
+						prephase = phase;
 					} else if (e.getX() >= 915 && e.getX() <= 975
-							&& e.getY() >= 880 && e.getY() <= 940) {
+							&& e.getY() >= 880 && e.getY() <= 940) { // start
+																		// wave
+																		// at 2x
+																		// speed
 						framerate = 60;
 						phase = 1;
+						prephase = phase;
 					}
 				}
+
+				// if in wave phase
 				if (phase == 1) {
 					if (e.getX() >= 840 && e.getX() <= 900 && e.getY() >= 880
-							&& e.getY() <= 940) {
+							&& e.getY() <= 940) { // set to normal speed
 						framerate = 30;
 					} else if (e.getX() >= 915 && e.getX() <= 975
-							&& e.getY() >= 880 && e.getY() <= 940) {
+							&& e.getY() >= 880 && e.getY() <= 940) { // set to
+																		// 2x
+																		// speed
 						framerate = 60;
 					} else if (e.getX() >= 990 && e.getX() <= 1050
-							&& e.getY() >= 880 && e.getY() <= 940) {
+							&& e.getY() >= 880 && e.getY() <= 940) { // pause
+																		// the
+																		// game
 						phase = 0;
+						prephase = phase;
 					}
 				}
+
+				// if gameover
 				if (phase == 2) {
 					if (e.getX() >= 300 && e.getX() <= 500 && e.getY() >= 500
-							&& e.getY() <= 600)
+							&& e.getY() <= 600) { // back to main menu after
+													// game over
+						prephase = phase;
 						phase = 3;
+					}
 				}
-				if (phase == 3) { // level selection
+
+				if (phase == 3) { // level selection and main menu
 					if (e.getX() >= 150 && e.getX() <= 350 && e.getY() >= 600
-							&& e.getY() <= 700) {
+							&& e.getY() <= 700) { // select the first map after
+													// clicking on first button
 						whichMap = 0;
+						prephase = phase;
 						phase = 0;
 						writeToOutput("Map 1 selected");
 						init();
 					} else if (e.getX() >= 450 && e.getX() <= 650
-							&& e.getY() >= 600 && e.getY() <= 700) {
+							&& e.getY() >= 600 && e.getY() <= 700) {// select
+																	// the
+																	// second
+																	// map after
+						// clicking on second button
 						whichMap = 1;
+						prephase = phase;
 						phase = 0;
 						writeToOutput("Map 2 selected");
 						init();
 					} else if (e.getX() >= 750 && e.getX() <= 950
-							&& e.getY() >= 600 && e.getY() <= 700) {
+							&& e.getY() >= 600 && e.getY() <= 700) {// select
+																	// the third
+																	// map after
+						// clicking on third button
 						whichMap = 2;
+						prephase = phase;
 						phase = 0;
 						writeToOutput("Map 3 selected");
 						init();
 					} else if (e.getX() >= 300 && e.getX() <= 500
-							&& e.getY() >= 725 && e.getY() <= 825) {
+							&& e.getY() >= 725 && e.getY() <= 825) { // go to
+																		// help
+																		// menu
 						phase = 4;
+						prephase = phase;
 					} else if (e.getX() >= 600 && e.getX() <= 800
-							&& e.getY() >= 725 && e.getY() <= 825) {
+							&& e.getY() >= 725 && e.getY() <= 825) { // exit the
+																		// game
 						System.exit(0);
 					}
 				}
+
 				if (phase == 4) { // information screen
 					if (e.getX() >= 450 && e.getX() <= 650 && e.getY() >= 800
-							&& e.getY() <= 1000)
+							&& e.getY() <= 1000) { // return to main menu
 						phase = 3;
+						prephase = phase;
+					}
 				}
-				if (phase < 2) {
-					if (e.getX() >= 820 && e.getX() <= 1065 && e.getY() >= 810
-							&& e.getY() <= 860)
-						phase = 3;
 
+				// if you are in standby or wave; and using game gui
+				if (phase < 2) {
+
+					if (e.getX() >= 820 && e.getX() <= 1065 && e.getY() >= 810
+							&& e.getY() <= 860) { // return to main menu from
+													// game
+						prephase = phase;
+						phase = 3;
+					}
+
+					// select an existing tower for stats and upgrades
 					if (e.getX() <= 800 && e.getY() <= 800)
 						towerSelect = map.towerClicked(e.getX(), e.getY());
 
-					// upgrade tower
+					// upgrade tower if you can
 					if (e.getX() >= 840 && e.getX() <= 1065 && e.getY() >= 630
 							&& e.getY() <= 730 && towerSelect > -1) {
 						if (money < map.towers.get(towerSelect).upgradeCost)
 							writeToOutput("Insufficient funds to upgrade "
 									+ Tower.names[map.towers.get(towerSelect).type]);
 						else {
-							map.towers.get(towerSelect).upgrade();
 							money -= map.towers.get(towerSelect).upgradeCost;
+							map.towers.get(towerSelect).upgrade();
 						}
 					}
 
-					// buy a new tower
+					// buy and place the new tower
 					if (purchaseSelect != 5 && e.getX() <= 800
 							&& e.getY() <= 800) {
 						if (!map.canPlaceTower(e.getX(), e.getY())) {
@@ -183,6 +294,7 @@ public class MapleTD extends Canvas {
 					} else
 						purchaseSelect = 5;
 
+					// select your tower for purchase or placement
 					if (e.getX() >= 820 && e.getX() <= 1085 && e.getY() >= 10
 							&& e.getY() <= 95) {
 						purchaseSelect = 0;
@@ -209,8 +321,8 @@ public class MapleTD extends Canvas {
 		});
 	}
 
+	// write to the "console"
 	public void writeToOutput(String s) {
-		// String temp = consoleOutput[0];
 		for (int x = 4; x > 0; x--) {
 			consoleOutput[x] = consoleOutput[x - 1];
 		}
@@ -224,39 +336,36 @@ public class MapleTD extends Canvas {
 			bgBuffer = createImage(getWidth(), getHeight());
 	}
 
+	// update panel
 	public void update(Graphics g) {
 		paint(g);
 	}
 
+	// paint class
 	public void paint(Graphics g) {
-
 		createBGBuffer();
 		paintOntoSomethingElse(bgBuffer.getGraphics());// paint onto background
 		// buffer
 		g.drawImage(bgBuffer, 0, 0, null); // copy background to primary buffer
 	}
 
+	// painting
 	public void paintOntoSomethingElse(Graphics g) {
 		g.clearRect(0, 0, getWidth(), getHeight()); // clear buffer
 		if (phase == 1)
 			tic();
-		else if (phase == 2) {
-			Graphics2D g2D = (Graphics2D) (g);
-			g2D.fillRect(250, 350, 600, 300);
-			g2D.setFont(new Font("Comic Sans", Font.BOLD, 69));
-			g2D.drawString("You lost", 300, 300);
-		}
 		paint2(g);
 	}
 
+	// main paint class
 	public void paint2(Graphics g) {
 		Graphics2D g2 = (Graphics2D) (g);
 		g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
-				RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-		if (phase >= 3) {
+				RenderingHints.VALUE_TEXT_ANTIALIAS_ON); // antialiasing
+		if (phase >= 3) { // if you are in main menu or help menu
 			mainMenu(g2);
 		}
-		if (phase < 3) {
+		if (phase < 3) { // if you are in the game
 			gui(g2);
 			map.drawPath(g2, whichMap);
 
@@ -270,7 +379,8 @@ public class MapleTD extends Canvas {
 			// g2.drawLine(0, x * 80, 800, x * 80);
 			// }
 
-			if (towerSelect > -1) {
+			if (towerSelect > -1) { // if you clicked on an existing tower, show
+									// its range
 				Tower temp = map.towers.get(towerSelect);
 				g2.setColor(new Color(255, 255, 255, 50));
 				g2.fill(temp.tRange);
@@ -278,10 +388,11 @@ public class MapleTD extends Canvas {
 
 			map.drawMobs(g2);
 			map.drawTower(g2);
-			if (phase < 3 && phase != 0)
+			if (phase < 3 && phase != 0) // draw projectiles if you are actively
+											// in a wave
 				map.drawProjectiles(g2);
 
-			if (phase == 2) {
+			if (phase == 2) { // if you lose, draw this stuff
 				g2.setFont(new Font("Comic Sans MS", Font.BOLD, 100));
 				g.setColor(Color.red);
 				g2.drawString("YOU LOSE", 400 - g2.getFontMetrics()
@@ -295,8 +406,9 @@ public class MapleTD extends Canvas {
 		}
 	}
 
+	// main menu and help menu
 	public void mainMenu(Graphics2D g) {
-		try {
+		try { // import background image and title
 			g.drawImage(ImageIO.read(new File("MSBackground.png")), 0, 0, 1100,
 					1000, null);
 			g.drawImage(ImageIO.read(new File("Maplestory_Title.png")), 150,
@@ -304,14 +416,19 @@ public class MapleTD extends Canvas {
 		} catch (IOException e) {
 			System.out.println("Background image not found");
 		}
+		consoleOutput = new String[] { "", "", "", "", "" }; // reset the
+																// console
 
+		// title
 		g.setColor(Color.BLACK);
 		g.setFont(new Font("Comic Sans MS", Font.BOLD, 100));
 		String title = "Tower Defense";
 		g.drawString(title, 550 - g.getFontMetrics().stringWidth(title) / 2,
 				400);
 
+		// main menu
 		if (phase == 3) {
+			// buttons to select levels
 			g.setColor(Color.orange);
 			g.fillRect(150, 600, 200, 100);
 			g.fillRect(450, 600, 200, 100);
@@ -325,6 +442,7 @@ public class MapleTD extends Canvas {
 			g.drawString("Level 3",
 					850 - g.getFontMetrics().stringWidth("Level 3") / 2, 660);
 
+			// draw thumbnail of each map above its respective button
 			g.drawImage(map.mapThumbs[0], 175, 425, 150, 150, null);
 			g.drawImage(map.mapThumbs[1], 475, 425, 150, 150, null);
 			g.drawImage(map.mapThumbs[2], 775, 425, 150, 150, null);
@@ -333,18 +451,21 @@ public class MapleTD extends Canvas {
 			g.drawRect(475, 425, 150, 150);
 			g.drawRect(775, 425, 150, 150);
 
+			// help button
 			g.setColor(Color.CYAN);
 			g.fillRect(300, 725, 200, 100);
 			g.setColor(Color.white);
 			g.drawString("Help",
 					400 - g.getFontMetrics().stringWidth("Help") / 2, 785);
 
+			// exit game button
 			g.setColor(Color.RED);
 			g.fillRect(600, 725, 200, 100);
 			g.setColor(Color.white);
 			g.drawString("Exit",
 					700 - g.getFontMetrics().stringWidth("Exit") / 2, 785);
-		} else {
+		} else { // help screen
+			// help information
 			String[] helpM = new String[] {
 					"Welcome to Maplestory Tower Defense!",
 					"Here you will learn the basic mechanics of the game.",
@@ -369,6 +490,7 @@ public class MapleTD extends Canvas {
 						550 - g.getFontMetrics().stringWidth(helpM[x]) / 2,
 						480 + x * 20);
 
+			// return to main menu
 			g.setColor(Color.blue);
 			g.fillRect(450, 800, 200, 100);
 			g.setColor(Color.white);
@@ -399,7 +521,7 @@ public class MapleTD extends Canvas {
 		g.drawString(consoleOutput[1], 310, 900);
 		g.drawString(consoleOutput[0], 310, 920);
 
-		// right column
+		// right column; towers
 		g.setFont(new Font("Comic Sans MS", Font.PLAIN, 16));
 		g.setColor(Color.black); // upgrade towers
 		g.setStroke(new BasicStroke(5));
@@ -428,8 +550,9 @@ public class MapleTD extends Canvas {
 		g.setColor(Color.black);
 		g.drawString("Wave: " + wave, 5, 920);
 
-		// purchase information
 		g.drawRect(815, 455, 255, 340);
+
+		// purchase information
 		if (purchaseSelect < 5) {
 			double[] damages = new double[] { 1, 2, 1.2, 5, 3 };
 			int[] fireRate = new int[] { 95, 45, 20, 60, 30 };
@@ -449,8 +572,6 @@ public class MapleTD extends Canvas {
 		// upgrade information, when a tower is clicked
 		if (towerSelect > -1) {
 			Tower temp = map.towers.get(towerSelect);
-			// g.setColor(new Color(255, 255, 255, 50));
-			// g.fill(temp.tRange);
 			g.setColor(Color.black);
 			g.setFont(new Font("Comic Sans MS", Font.BOLD, 20));
 			g.drawString("Level " + temp.towerLevel + " "
@@ -473,6 +594,7 @@ public class MapleTD extends Canvas {
 		// return to main menu
 		g.setColor(Color.blue);
 		g.fillRect(820, 810, 245, 50);
+		g.setFont(new Font("Comic Sans MS", Font.BOLD, 32));
 		g.setColor(Color.white);
 		g.drawString("Main Menu", 860, 845);
 
@@ -506,6 +628,7 @@ public class MapleTD extends Canvas {
 		g.fillRect(1023, 890, 10, 40);
 	}
 
+	// initialize your user information at the start of each new game
 	public void init() {
 		map = new Map(1, whichMap);
 		life = 100;
@@ -514,19 +637,30 @@ public class MapleTD extends Canvas {
 		timer = 0;
 	}
 
+	// each "tick" of time, updates the game
 	public void tic() {
-		if (life <= 0) {
+		if (life <= 0) { // if you lose
 			writeToOutput("Game over");
+			prephase = phase;
 			phase = 2;
 		}
-		if (timer >= wave * 75 && map.getMobs().isEmpty()) {
+		if (timer >= wave * 75 && map.getMobs().isEmpty()) { // if you have
+																// finished a
+																// wave
 			writeToOutput("Level " + wave);
 			timer = 0;
 			money += wave * 10;
 			wave++;
 			map.updateLevel(wave);
 			phase = 0;
-		} else if ((!map.getMobs().isEmpty() && phase != 0) || phase == 1) {
+			prephase = phase;
+		} else if ((!map.getMobs().isEmpty() && phase != 0) || phase == 1) { // if
+																				// you
+																				// are
+																				// currently
+																				// in
+																				// a
+																				// wave
 			life -= map.tic(timer);
 			money += map.checkMoney();
 			timer++;

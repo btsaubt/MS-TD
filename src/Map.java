@@ -11,10 +11,9 @@ import java.util.*;
 import javax.imageio.ImageIO;
 
 public class Map {
-	public int wave;
+	public int wave; // which wave are you on
 
 	public BufferedImage[] maps = new BufferedImage[3];
-	public BufferedImage[] paths = new BufferedImage[3];
 	public BufferedImage[] sprites = new BufferedImage[3];
 	public BufferedImage[] towerImages = new BufferedImage[5];
 	public BufferedImage[] projectileImages = new BufferedImage[2];
@@ -22,58 +21,79 @@ public class Map {
 	public BufferedImage[] mapThumbs = new BufferedImage[3];
 	public BufferedImage cygnus;
 
-	public ArrayList<Mob> mobs = new ArrayList<Mob>();
-	public ArrayList<Tower> towers = new ArrayList<Tower>();
-	public ArrayList<Projectile> projectiles = new ArrayList<Projectile>();
-	public int pathLength = 0; // total travel length,
-	public int moneyAdd = 0;
+	public ArrayList<Mob> mobs = new ArrayList<Mob>(); // mobs on the map
+	public ArrayList<Tower> towers = new ArrayList<Tower>(); // towers on the
+																// map
+	public ArrayList<Projectile> projectiles = new ArrayList<Projectile>(); // projectiles
+																			// on
+																			// the
+																			// map
+	public int pathLength = 0; // total travel length, calculated differently
+								// for each map
+	public int moneyAdd = 0; // how much money should be added
 
 	// 0 for up, 1 for down, 2 for left, 3 for right
-	public int[][] direction = new int[][] { { 1, 3, 0, 3, 1 },
+	public final int[][] direction = new int[][] { { 1, 3, 0, 3, 1 },
 			{ 1, 3, 1, 2, 1, 3, 1, 2, 1 }, { 1, 3, 0, 2, 1, 3, 0, 2 } };
-	public double[][] lengths = new double[][] { { 8.5, 3.5, 7, 3.5, 9.5 },
-			{ 2, 7, 2, 7, 2, 7, 2, 7, 1.5 }, { 8.5, 7, 7, 5, 5, 3, 3, 1 } };
 
-	public int[][] ends = new int[][] { new int[] { 640, 720 },
+	// by increments of 80 pixels; 1 = 80 pixels, 2.5 = 200 pixels
+	public final double[][] lengths = new double[][] {
+			{ 8.5, 3.5, 7, 3.5, 9.5 }, { 2, 7, 2, 7, 2, 7, 2, 7, 1.5 },
+			{ 8.5, 7, 7, 5, 5, 3, 3, 1 } };
+
+	// end location of each map (top left)
+	public final int[][] ends = new int[][] { new int[] { 640, 720 },
 			new int[] { 80, 720 }, new int[] { 400, 240 } };
 
-	public int[][] path1Coords = new int[][] {
+	// coordinates for the path
+	public final int[][] path1Coords = new int[][] {
 			{ 80, 80, 440, 440, 640, 640, 720, 720, 360, 360, 160, 160 },
 			{ 0, 720, 720, 160, 160, 800, 800, 80, 80, 640, 640, 0 } };
-	public int[][] path2Coords = new int[][] {
+	public final int[][] path2Coords = new int[][] {
 			{ 80, 80, 640, 640, 80, 80, 640, 640, 80, 80, 160, 160, 720, 720,
 					160, 160, 720, 720, 160, 160 },
 			{ 0, 200, 200, 280, 280, 520, 520, 600, 600, 800, 800, 680, 680,
 					440, 440, 360, 360, 120, 120, 0 } };
-	public int[][] path3Coords = new int[][] {
+	public final int[][] path3Coords = new int[][] {
 			{ 80, 80, 720, 720, 240, 240, 560, 560, 400, 400, 480, 480, 320,
 					320, 640, 640, 160, 160 },
 			{ 0, 720, 720, 80, 80, 560, 560, 240, 240, 320, 320, 480, 480, 160,
 					160, 640, 640, 0 } };
-	public int[][][] pathCoords = new int[][][] { path1Coords, path2Coords,
-			path3Coords };
+	public final int[][][] pathCoords = new int[][][] { path1Coords,
+			path2Coords, path3Coords };
 	public Polygon pathPoly = new Polygon();
-	public int whichMap = 0; // map 0, 1, 2
+	public int whichMap = 0; // map 0 - sleepywood, 1 - pyramid, 2 - leafre
 
+	// constructor
 	public Map(int l, int p) {
 		wave = l;
 		whichMap = p;
 		pathLength = 0;
 		for (int x = 0; x < lengths[whichMap].length; x++) {
-			pathLength += lengths[whichMap][x];
+			pathLength += lengths[whichMap][x]; // calculate the total length of
+												// the path
 		}
 		reader();
 		pathPoly = new Polygon(pathCoords[whichMap][0],
-				pathCoords[whichMap][1], pathCoords[whichMap][0].length);
-
-		// TEMPORARY TESTING
-		// towerPurchase(2, 450, 400);
+				pathCoords[whichMap][1], pathCoords[whichMap][0].length); // create
+																			// a
+																			// polygon
+																			// based
+																			// off
+																			// of
+																			// the
+																			// coordinates
+																			// of
+																			// the
+																			// path
 	}
 
+	// draw a tower at the given location with given width and height
 	public void drawJob(Graphics2D g, int t, int x, int y, int w, int h) {
 		g.drawImage(towerImages[t], x, y, w, h, null);
 	}
 
+	// draw all mobs on the path
 	public void drawMobs(Graphics2D g) {
 		Mob t;
 		g.setColor(Color.green);
@@ -81,11 +101,11 @@ public class Map {
 			t = mobs.get(x);
 			int[] c = t.calcCoords(direction[whichMap], lengths[whichMap],
 					pathLength);
+			g.drawImage(sprites[whichMap], c[0] - sprites[whichMap].getWidth()
+					/ 2, c[1], null);
 			g.fillRect(c[0] - 30, c[1],
 					(int) (60.0 * (1.0 * Math.round(t.hp) / (wave * wave))), 8); // health
 																					// bar
-			g.drawImage(sprites[whichMap], c[0] - sprites[whichMap].getWidth()
-					/ 2, c[1], null);
 		}
 	}
 
@@ -109,12 +129,14 @@ public class Map {
 		return temp;
 	}
 
+	// check if money should be added; if so, then return how much
 	public int checkMoney() {
 		int temp = moneyAdd;
 		moneyAdd = 0;
 		return temp;
 	}
 
+	// return whether a tower has been clicked on
 	public int towerClicked(int x, int y) {
 		for (int z = 0; z < towers.size(); z++)
 			if (new Rectangle2D.Double(towers.get(z).getCoords()[0] - 30,
@@ -124,6 +146,8 @@ public class Map {
 		return -1;
 	}
 
+	// "tick"; do damage to mobs, spawn new mobs, move mobs, and return how much
+	// damage is done to empress cygnus
 	public int tic(int timer) {
 		int damage = 0;
 
@@ -137,14 +161,13 @@ public class Map {
 
 		// mob movement
 		for (int x = 0; x < mobs.size(); x++) {
-			if (mobs.get(x).getExist()){
+			if (mobs.get(x).getExist()) {
 				int t = mobs.get(x).move(pathLength);
-				if(t!=0){
-					damage+=t;
+				if (t != 0) {
+					damage += t;
 					mobs.remove(x);
 				}
-			}
-			else {
+			} else {
 				mobs.remove(x);
 
 				// add money
@@ -168,6 +191,7 @@ public class Map {
 		return damage;
 	}
 
+	// draw the towers on the map
 	public void drawTower(Graphics2D g) {
 		Tower t;
 		int[] c;
@@ -175,17 +199,18 @@ public class Map {
 			t = towers.get(x);
 			c = t.coords;
 			g.drawImage(towerImages[t.type], c[0] - 30, c[1] - 30, 60, 60, null);
-			// g.fill(t.tRange);
 			if (t.animate)
-				g.drawImage(attackImages[t.type], c[0] - 60, c[1] - 30, 120,
-						120, null);
+				g.drawImage(attackImages[t.type], c[0] - 40, c[1] - 50, 80, 80,
+						null);
 		}
 	}
 
+	// update to the next level
 	public void updateLevel(int w) {
 		wave = w;
 	}
 
+	// draw all projectiles on the map
 	public void drawProjectiles(Graphics2D g) {
 		for (int x = 0; x < projectiles.size(); x++) {
 			Projectile p = projectiles.get(x);
@@ -195,6 +220,7 @@ public class Map {
 		}
 	}
 
+	// draw the path
 	public void drawPath(Graphics2D g, int wm) {
 		g.setColor(new Color(234, 206, 106));
 		g.drawImage(maps[wm], 0, 0, 400, 400, null);
@@ -203,25 +229,26 @@ public class Map {
 		g.drawImage(maps[wm], 400, 400, 400, 400, null);
 		g.fillPolygon(pathPoly);
 
+		// draw cygnus
 		g.drawImage(cygnus, ends[whichMap][0], ends[whichMap][1], 80, 80, null);
 	}
 
+	// return the ArrayList of mobs
 	public ArrayList<Mob> getMobs() {
 		return mobs;
 	}
 
+	// read files
 	public void reader() {
 		try {
 			BufferedImage temp;
 
+			// background image
 			maps[0] = ImageIO.read(new File("sector_map.png"));
 			maps[1] = ImageIO.read(new File("pyramid_map.png"));
 			maps[2] = ImageIO.read(new File("leafre_map.png"));
 
-			paths[0] = ImageIO.read(new File("sector_path.png"));
-			paths[1] = ImageIO.read(new File("pyramid_path.png"));
-			paths[2] = ImageIO.read(new File("leafre_path.png"));
-
+			// monsters and resize larger images
 			sprites[0] = ImageIO.read(new File("Orange_Mushroom.gif"));
 			sprites[1] = ImageIO.read(new File("Commander_Skeleton.png"));
 			sprites[2] = ImageIO.read(new File("Stone_Golem.png"));
@@ -238,28 +265,34 @@ public class Map {
 					sprites[2].getHeight(), null);
 			sprites[2] = temp;
 
+			// attack animations
 			attackImages[0] = ImageIO.read(new File("FireAttack.png"));
 			attackImages[1] = ImageIO.read(new File("ArcherAttack.png"));
 			attackImages[2] = ImageIO.read(new File("ThiefAttack.png"));
 			attackImages[3] = ImageIO.read(new File("SwordAttack.png"));
 			attackImages[4] = ImageIO.read(new File("BreakerAttack.png"));
 
+			// projectile sprites
 			projectileImages[0] = ImageIO.read(new File("Arrow.png"));
 			projectileImages[1] = ImageIO.read(new File("Star.png"));
 
+			// tower sprites
 			towerImages[0] = ImageIO.read(new File("BlazeWizard.png"));
 			towerImages[1] = ImageIO.read(new File("WindArcher.png"));
 			towerImages[2] = ImageIO.read(new File("NightWalker.png"));
 			towerImages[3] = ImageIO.read(new File("DawnWarrior.png"));
 			towerImages[4] = ImageIO.read(new File("ThunderBreaker.png"));
 
+			// empress cygnus
 			cygnus = ImageIO.read(new File("Empress_Cygnus.png"));
-			
-			for(int x=0; x<3; x++){
-				mapThumbs[x] = new BufferedImage(800, 800, BufferedImage.TYPE_4BYTE_ABGR);
-				pathPoly = new Polygon(pathCoords[x][0],
-						pathCoords[x][1], pathCoords[x][0].length);
-				drawPath((Graphics2D)(mapThumbs[x].getGraphics()), x);
+
+			//thumbnails of each map
+			for (int x = 0; x < 3; x++) {
+				mapThumbs[x] = new BufferedImage(800, 800,
+						BufferedImage.TYPE_4BYTE_ABGR);
+				pathPoly = new Polygon(pathCoords[x][0], pathCoords[x][1],
+						pathCoords[x][0].length);
+				drawPath((Graphics2D) (mapThumbs[x].getGraphics()), x);
 			}
 		} catch (IOException e) {
 			System.out.println("Map file not found");
